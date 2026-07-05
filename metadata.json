@@ -1,0 +1,6 @@
+{
+  "name": "Celebration Studio",
+  "description": "An elegant, cozy, and luxury event rental studio. Syncs inventory dynamically with Supabase Cloud Database and automates manual payment order coordination via WhatsApp.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
