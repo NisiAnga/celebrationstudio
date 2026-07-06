@@ -203,7 +203,7 @@ function AdminLoginScreen({ onSuccess }: { onSuccess: () => void }) {
 export default function AdminApp() {
   // Three states: 'checking' | 'locked' | 'unlocked'
   const [authState, setAuthState] = React.useState<'checking' | 'locked' | 'unlocked'>('checking');
-  const [initialTab, setInitialTab] = React.useState<'supabase' | 'bank' | 'stock'>('supabase');
+  const [initialTab, setInitialTab] = React.useState<'supabase' | 'bank' | 'stock'>('stock');
 
   const [bankDetails, setBankDetails] = React.useState<BankDetails>(DEFAULT_BANK_DETAILS);
   const [studioWhatsapp, setStudioWhatsapp] = React.useState<string>(DEFAULT_STUDIO_WHATSAPP);
@@ -313,7 +313,7 @@ export default function AdminApp() {
     );
   }
 
-  // Login screen
+  // Login screen — on success show the admin panel
   if (authState === 'locked') {
     return <AdminLoginScreen onSuccess={() => setAuthState('unlocked')} />;
   }
@@ -345,6 +345,8 @@ export default function AdminApp() {
           </a>
           <a
             href="/"
+            target="_blank"
+            rel="noopener noreferrer"
             className="px-4 py-2 rounded-xl text-xs font-semibold tracking-wider uppercase border border-blush bg-white text-gray-600 hover:bg-blush-light transition-all"
           >
             View Storefront

@@ -348,7 +348,7 @@ function OrderTableRow({
 
         {/* Actions */}
         <td className="px-4 py-3">
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-2">
             {isUpdating ? (
               <RefreshCw className="w-4 h-4 text-camel animate-spin" />
             ) : isTerminal ? (
@@ -356,13 +356,37 @@ function OrderTableRow({
                 {order.status === 'received' ? '✓ Complete' : '✗ Cancelled'}
               </span>
             ) : (
-              transitions.map(t => (
-                <button key={t.to} onClick={() => onAction(order.id, t.to)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-all cursor-pointer ${t.style}`}>
-                  <t.icon className="w-3 h-3" />{t.label}
+              <>
+                {/* Status dropdown */}
+                <select
+                  value={order.status}
+                  onChange={(e) => onAction(order.id, e.target.value as OrderStatus)}
+                  className="text-[11px] font-semibold border border-blush rounded-lg px-2.5 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-camel/30 focus:border-camel cursor-pointer transition-all"
+                >
+                  <option value={order.status} disabled>
+                    {STATUS_CONFIG[order.status].label}
+                  </option>
+                  {((['confirmed', 'need_to_collect', 'collected_delivered', 'received'] as OrderStatus[])
+                    .filter(s => s !== order.status)
+                    .map(s => (
+                      <option key={s} value={s}>
+                        {STATUS_CONFIG[s].label}
+                      </option>
+                    ))
+                  )}
+                </select>
+
+                {/* Cancel button */}
+                <button
+                  onClick={() => onAction(order.id, 'cancelled')}
+                  title="Cancel this order"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  <XCircle className="w-3.5 h-3.5" /> Cancel
                 </button>
-              ))
+              </>
             )}
+
             {/* Expand toggle */}
             <button onClick={() => setExpanded(v => !v)}
               className="p-1 rounded-lg text-gray-400 hover:text-camel hover:bg-blush transition-all cursor-pointer"
@@ -497,8 +521,8 @@ export default function AdminOrdersPage() {
     try {
       await updateOrderStatus(id, to);
 
-      // If marking as received → restore inventory stock
-      if (to === 'received') {
+      // Restore inventory when items are returned (received) OR order is cancelled
+      if (to === 'received' || to === 'cancelled') {
         const restorePayload = order.items.map(it => ({
           itemId: it.item_id,
           restoreQty: it.quantity,

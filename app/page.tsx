@@ -52,6 +52,40 @@ export default function App() {
 
   // Cart state
   const [cart, setCart] = React.useState<CartItem[]>([]);
+  const isCartLoaded = React.useRef(false);
+
+  // Load saved cart from sessionStorage on mount / when inventory is available
+  React.useEffect(() => {
+    if (isCartLoaded.current || inventory.length === 0) return;
+    try {
+      const raw = sessionStorage.getItem('celebration_studio_checkout_cart');
+      if (raw) {
+        const minimalCart = JSON.parse(raw) as { id: string; quantity: number }[];
+        const loadedCart = minimalCart
+          .map(item => {
+            const found = inventory.find(inv => inv.id === item.id);
+            if (!found) return null;
+            return { item: found, quantity: item.quantity };
+          })
+          .filter((c): c is CartItem => c !== null);
+        setCart(loadedCart);
+      }
+    } catch (e) {
+      console.error('Failed to restore cart:', e);
+    } finally {
+      isCartLoaded.current = true;
+    }
+  }, [inventory]);
+
+  // Sync cart changes back to sessionStorage
+  React.useEffect(() => {
+    if (!isCartLoaded.current) return;
+    const minimalCart = cart.map(c => ({
+      id: c.item.id,
+      quantity: c.quantity
+    }));
+    sessionStorage.setItem('celebration_studio_checkout_cart', JSON.stringify(minimalCart));
+  }, [cart]);
 
   // Modals & Navigation Toggles
   const [currentOrder, setCurrentOrder] = React.useState<Order | null>(null);
@@ -123,20 +157,37 @@ export default function App() {
   }, [fetchInventory]);
 
   // Supabase Realtime subscription: patch individual inventory items in-place
-  // whenever another device or the admin panel updates stock.
-  // Requires the `inventory` table to have Realtime enabled in the Supabase dashboard.
+  // whenever any device updates stock (orders, admin panel, etc.).
+  // Uses a unique channel name per session to avoid conflicts across browser tabs.
+  // Also polls every 30 seconds as a fallback in case Realtime is not enabled
+  // on the inventory table in the Supabase dashboard.
   React.useEffect(() => {
     const { url, anonKey } = getSupabaseConfig();
-    if (!url || !anonKey) return; // Skip if not configured
+    if (!url || !anonKey) return;
 
-    const unsubscribe = subscribeToInventoryChanges((updatedItem) => {
-      setInventory(prevInv =>
-        prevInv.map(item => item.id === updatedItem.id ? updatedItem : item)
-      );
-    });
+    // Unique channel name prevents collisions when multiple tabs are open
+    const channelId = `inventory-storefront-${Math.random().toString(36).slice(2, 8)}`;
 
-    return unsubscribe; // Clean up channel on unmount
-  }, []);
+    const unsubscribeRealtime = subscribeToInventoryChanges(
+      channelId,
+      (updatedItem) => {
+        setInventory(prevInv =>
+          prevInv.map(item => item.id === updatedItem.id ? updatedItem : item)
+        );
+      }
+    );
+
+    // Polling fallback — re-fetch full inventory every 30 s
+    // Covers the case where Supabase Realtime isn't enabled
+    const pollInterval = setInterval(() => {
+      fetchInventory();
+    }, 30_000);
+
+    return () => {
+      unsubscribeRealtime();
+      clearInterval(pollInterval);
+    };
+  }, [fetchInventory]);
 
   // Cart operations
   const handleAddToCart = (item: RentalItem, qty: number) => {
@@ -476,17 +527,34 @@ export default function App() {
                 )}
               </div>
 
-              {/* Render Booking logistics form only if cart has items */}
+              {/* Book Studio Items — navigate to dedicated checkout page */}
               {cart.length > 0 && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <BookingForm
-                    cart={cart}
-                    onSubmit={handlePlaceOrder}
-                  />
+                  <button
+                    onClick={() => {
+                      // Save minimal cart info (ids and quantity) to avoid sessionStorage quota limit
+                      const minimalCart = cart.map(c => ({
+                        id: c.item.id,
+                        quantity: c.quantity
+                      }));
+                      sessionStorage.setItem(
+                        'celebration_studio_checkout_cart',
+                        JSON.stringify(minimalCart)
+                      );
+                      window.location.href = '/checkout';
+                    }}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 px-6 bg-terracotta hover:bg-terracotta-dark text-white font-bold text-sm rounded-2xl shadow-md hover:shadow-lg transition-all duration-300 active:scale-[0.98] cursor-pointer"
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    Book Studio Items
+                  </button>
+                  <p className="text-center text-[10px] text-gray-400 mt-2">
+                    Review your order and checkout via WhatsApp
+                  </p>
                 </motion.div>
               )}
 

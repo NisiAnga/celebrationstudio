@@ -22,11 +22,33 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [activeImageIdx, setActiveImageIdx] = React.useState(0);
   const [localQty, setLocalQty] = React.useState(1);
   const [addedAnimation, setAddedAnimation] = React.useState(false);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, clientWidth } = scrollRef.current;
+    if (clientWidth === 0) return;
+    const index = Math.round(scrollLeft / clientWidth);
+    setActiveImageIdx(index);
+  };
+
+  const handleSelectThumbnail = (index: number) => {
+    setActiveImageIdx(index);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        left: index * scrollRef.current.clientWidth,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   // Reset indices on item change
   React.useEffect(() => {
     setActiveImageIdx(0);
     setLocalQty(cartQuantity > 0 ? cartQuantity : 1);
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = 0;
+    }
   }, [item, cartQuantity]);
 
   if (!isOpen || !item) return null;
@@ -36,7 +58,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     ? item.images 
     : [item.image];
 
-  const activeImage = images[activeImageIdx] || item.image;
   const isOutOfStock = item.available <= 0;
 
   const increment = () => {
@@ -73,16 +94,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         {/* Left Side: Product Gallery */}
         <div className="w-full md:w-1/2 p-6 md:p-8 flex flex-col justify-between border-b md:border-b-0 md:border-r border-blush/40">
           <div className="relative aspect-4/3 rounded-2xl overflow-hidden border border-blush shadow-xs bg-gray-50 flex items-center justify-center">
-            <img
-              src={activeImage}
-              alt={`${item.name} active display`}
-              className="w-full h-full object-cover transition-all duration-300"
-              onError={(e) => {
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=600';
-              }}
-            />
             
-            <span className="absolute top-4 left-4 bg-white/95 backdrop-blur-xs text-olive-dark text-[10px] uppercase tracking-widest font-semibold px-2.5 py-1 rounded-full shadow-xs">
+            {/* Scrollable Gallery container */}
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="flex flex-row overflow-x-auto snap-x snap-mandatory scrollbar-none h-full w-full"
+            >
+              {images.map((imgUrl, idx) => (
+                <img
+                  key={idx}
+                  src={imgUrl}
+                  alt={`${item.name} active display ${idx + 1}`}
+                  className="w-full h-full object-cover shrink-0 snap-center transition-all duration-300"
+                  onError={(e) => {
+                    e.currentTarget.src = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=600';
+                  }}
+                />
+              ))}
+            </div>
+            
+            <span className="absolute top-4 left-4 bg-white/95 backdrop-blur-xs text-olive-dark text-[10px] uppercase tracking-widest font-semibold px-2.5 py-1 rounded-full shadow-xs pointer-events-none">
               {item.category}
             </span>
           </div>
@@ -93,7 +125,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {images.map((imgUrl, index) => (
                 <button
                   key={index}
-                  onClick={() => setActiveImageIdx(index)}
+                  onClick={() => handleSelectThumbnail(index)}
                   className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all shrink-0 cursor-pointer ${index === activeImageIdx ? 'border-terracotta scale-95 shadow-md' : 'border-blush/60 hover:border-camel'}`}
                 >
                   <img

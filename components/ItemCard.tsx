@@ -21,6 +21,15 @@ export const ItemCard: React.FC<ItemCardProps> = ({
 }) => {
   const [localQty, setLocalQty] = React.useState(1);
   const [activeImageIdx, setActiveImageIdx] = React.useState(0);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, clientWidth } = scrollRef.current;
+    if (clientWidth === 0) return;
+    const index = Math.round(scrollLeft / clientWidth);
+    setActiveImageIdx(index);
+  };
 
   const images = Array.isArray(item.images) && item.images.length > 0 
     ? item.images 
@@ -28,6 +37,9 @@ export const ItemCard: React.FC<ItemCardProps> = ({
 
   React.useEffect(() => {
     setActiveImageIdx(0);
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = 0;
+    }
   }, [item]);
 
   React.useEffect(() => {
@@ -59,16 +71,6 @@ export const ItemCard: React.FC<ItemCardProps> = ({
     }
   };
 
-  const handlePrevImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveImageIdx(prev => (prev === 0 ? images.length - 1 : prev - 1));
-  };
-
-  const handleNextImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveImageIdx(prev => (prev === images.length - 1 ? 0 : prev + 1));
-  };
-
   const handleCardClick = () => {
     if (onViewDetails) {
       onViewDetails(item);
@@ -87,56 +89,82 @@ export const ItemCard: React.FC<ItemCardProps> = ({
 
   return (
     <div id={`item-card-${item.id}`} className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border border-blush flex flex-col h-full">
-      {/* Image Container with subtle zoom on hover */}
+      {/* Image Container with side-by-side scrolling */}
       <div 
-        onClick={handleCardClick}
         className="relative aspect-4/3 w-full bg-blush overflow-hidden cursor-pointer"
       >
-        <img
-          src={images[activeImageIdx] || item.image}
-          alt={item.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-          referrerPolicy="no-referrer"
-          onError={(e) => {
-            // Fallback elegant placeholder if image fails to load
-            e.currentTarget.src = `https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=600`;
-          }}
-        />
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          onClick={handleCardClick}
+          className="flex flex-row overflow-x-auto snap-x snap-mandatory scrollbar-none h-full w-full"
+        >
+          {images.map((imgUrl, idx) => (
+            <img
+              key={idx}
+              src={imgUrl}
+              alt={`${item.name} display ${idx + 1}`}
+              className="w-full h-full object-cover shrink-0 snap-center group-hover:scale-102 transition-transform duration-500 ease-out"
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.src = `https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=600`;
+              }}
+            />
+          ))}
+        </div>
 
-        {/* Carousel overlay controls */}
+        {/* Carousel buttons to also scroll programmatically on click if they want */}
         {images.length > 1 && (
-          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
-            <button
-              onClick={handlePrevImage}
-              className="w-6 h-6 rounded-full bg-white/95 backdrop-blur-xs flex items-center justify-center text-gray-700 hover:bg-white hover:text-terracotta border border-blush/60 shadow-xs pointer-events-auto transition-all cursor-pointer"
-              title="Previous Photo"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={handleNextImage}
-              className="w-6 h-6 rounded-full bg-white/95 backdrop-blur-xs flex items-center justify-center text-gray-700 hover:bg-white hover:text-terracotta border border-blush/60 shadow-xs pointer-events-auto transition-all cursor-pointer"
-              title="Next Photo"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
-        {/* Dots indicator at the bottom of image */}
-        {images.length > 1 && (
-          <div className="absolute bottom-2.5 inset-x-0 flex justify-center gap-1.5 pointer-events-none">
-            {images.map((_, idx) => (
-              <span
-                key={idx}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeImageIdx ? 'bg-terracotta scale-125' : 'bg-white/60'}`}
-              />
-            ))}
-          </div>
+          <>
+            <div className="absolute inset-y-0 top-1/2 -translate-y-1/2 flex justify-between px-2 w-full pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (scrollRef.current) {
+                    const idx = activeImageIdx === 0 ? images.length - 1 : activeImageIdx - 1;
+                    scrollRef.current.scrollTo({
+                      left: idx * scrollRef.current.clientWidth,
+                      behavior: 'smooth'
+                    });
+                  }
+                }}
+                className="w-6 h-6 rounded-full bg-white/95 backdrop-blur-xs flex items-center justify-center text-gray-700 hover:bg-white hover:text-terracotta border border-blush/60 shadow-xs pointer-events-auto transition-all cursor-pointer"
+                title="Previous Photo"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (scrollRef.current) {
+                    const idx = activeImageIdx === images.length - 1 ? 0 : activeImageIdx + 1;
+                    scrollRef.current.scrollTo({
+                      left: idx * scrollRef.current.clientWidth,
+                      behavior: 'smooth'
+                    });
+                  }
+                }}
+                className="w-6 h-6 rounded-full bg-white/95 backdrop-blur-xs flex items-center justify-center text-gray-700 hover:bg-white hover:text-terracotta border border-blush/60 shadow-xs pointer-events-auto transition-all cursor-pointer mr-4"
+                title="Next Photo"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            
+            {/* Scroll indicators dots */}
+            <div className="absolute bottom-2.5 inset-x-0 flex justify-center gap-1.5 pointer-events-none">
+              {images.map((_, idx) => (
+                <span
+                  key={idx}
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeImageIdx ? 'bg-terracotta scale-125' : 'bg-white/60'}`}
+                />
+              ))}
+            </div>
+          </>
         )}
 
         {/* Category Badge */}
-        <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs text-olive-dark text-[11px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-full shadow-xs">
+        <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs text-olive-dark text-[11px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-full shadow-xs pointer-events-none">
           {item.category}
         </span>
       </div>
