@@ -2,22 +2,33 @@
 
 import React from 'react';
 import { RentalItem } from '../types';
-import { Plus, Minus, Check, ShoppingBag, AlertTriangle } from 'lucide-react';
+import { Plus, Minus, Check, ShoppingBag, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ItemCardProps {
   item: RentalItem;
   cartQuantity: number;
   onAddToCart: (item: RentalItem, quantity: number) => void;
   onRemoveFromCart: (item: RentalItem) => void;
+  onViewDetails?: (item: RentalItem) => void;
 }
 
 export const ItemCard: React.FC<ItemCardProps> = ({
   item,
   cartQuantity,
   onAddToCart,
-  onRemoveFromCart
+  onRemoveFromCart,
+  onViewDetails
 }) => {
   const [localQty, setLocalQty] = React.useState(1);
+  const [activeImageIdx, setActiveImageIdx] = React.useState(0);
+
+  const images = Array.isArray(item.images) && item.images.length > 0 
+    ? item.images 
+    : [item.image];
+
+  React.useEffect(() => {
+    setActiveImageIdx(0);
+  }, [item]);
 
   React.useEffect(() => {
     // Reset local quantity if cart quantity changes or becomes 0
@@ -48,6 +59,22 @@ export const ItemCard: React.FC<ItemCardProps> = ({
     }
   };
 
+  const handlePrevImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveImageIdx(prev => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
+  const handleNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActiveImageIdx(prev => (prev === images.length - 1 ? 0 : prev + 1));
+  };
+
+  const handleCardClick = () => {
+    if (onViewDetails) {
+      onViewDetails(item);
+    }
+  };
+
   const handleAddClick = () => {
     onAddToCart(item, localQty);
   };
@@ -61,9 +88,12 @@ export const ItemCard: React.FC<ItemCardProps> = ({
   return (
     <div id={`item-card-${item.id}`} className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border border-blush flex flex-col h-full">
       {/* Image Container with subtle zoom on hover */}
-      <div className="relative aspect-4/3 w-full bg-blush overflow-hidden">
+      <div 
+        onClick={handleCardClick}
+        className="relative aspect-4/3 w-full bg-blush overflow-hidden cursor-pointer"
+      >
         <img
-          src={item.image}
+          src={images[activeImageIdx] || item.image}
           alt={item.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
           referrerPolicy="no-referrer"
@@ -72,6 +102,39 @@ export const ItemCard: React.FC<ItemCardProps> = ({
             e.currentTarget.src = `https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=600`;
           }}
         />
+
+        {/* Carousel overlay controls */}
+        {images.length > 1 && (
+          <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+            <button
+              onClick={handlePrevImage}
+              className="w-6 h-6 rounded-full bg-white/95 backdrop-blur-xs flex items-center justify-center text-gray-700 hover:bg-white hover:text-terracotta border border-blush/60 shadow-xs pointer-events-auto transition-all cursor-pointer"
+              title="Previous Photo"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleNextImage}
+              className="w-6 h-6 rounded-full bg-white/95 backdrop-blur-xs flex items-center justify-center text-gray-700 hover:bg-white hover:text-terracotta border border-blush/60 shadow-xs pointer-events-auto transition-all cursor-pointer"
+              title="Next Photo"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Dots indicator at the bottom of image */}
+        {images.length > 1 && (
+          <div className="absolute bottom-2.5 inset-x-0 flex justify-center gap-1.5 pointer-events-none">
+            {images.map((_, idx) => (
+              <span
+                key={idx}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${idx === activeImageIdx ? 'bg-terracotta scale-125' : 'bg-white/60'}`}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Category Badge */}
         <span className="absolute top-3 left-3 bg-white/95 backdrop-blur-xs text-olive-dark text-[11px] uppercase tracking-wider font-semibold px-2.5 py-1 rounded-full shadow-xs">
           {item.category}
@@ -82,12 +145,15 @@ export const ItemCard: React.FC<ItemCardProps> = ({
       <div className="p-5 flex-1 flex flex-col">
         <div className="flex-1">
           <div className="flex justify-between items-start gap-2 mb-1.5">
-            <h3 className="font-serif-luxury text-[18px] font-semibold text-gray-900 tracking-wide line-clamp-1 group-hover:text-terracotta transition-colors">
+            <h3 
+              onClick={handleCardClick}
+              className="font-serif-luxury text-[18px] font-semibold text-gray-900 tracking-wide line-clamp-1 group-hover:text-terracotta transition-colors cursor-pointer"
+            >
               {item.name}
             </h3>
             <div className="text-right">
               <span className="font-serif-luxury text-[18px] font-bold text-terracotta">
-                ${item.price}
+                Rs. {item.price}
               </span>
               <span className="text-[10px] text-gray-400 block -mt-1">/ day</span>
             </div>

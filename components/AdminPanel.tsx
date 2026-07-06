@@ -25,6 +25,7 @@ interface AdminPanelProps {
   onStudioWhatsappChange: (phone: string) => void;
   inventory: RentalItem[];
   onRefreshInventory: () => void;
+  initialTab?: 'supabase' | 'bank' | 'stock';
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -35,9 +36,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   studioWhatsapp,
   onStudioWhatsappChange,
   inventory,
-  onRefreshInventory
+  onRefreshInventory,
+  initialTab = 'supabase'
 }) => {
-  const [activeTab, setActiveTab] = React.useState<'supabase' | 'bank' | 'stock'>('supabase');
+  const [activeTab, setActiveTab] = React.useState<'supabase' | 'bank' | 'stock'>(initialTab);
   const [bankForm, setBankForm] = React.useState<BankDetails>({ ...bankDetails });
   const [phoneForm, setPhoneForm] = React.useState(studioWhatsapp);
   const [isSyncing, setIsSyncing] = React.useState(false);
@@ -54,22 +56,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newItemStock, setNewItemStock] = React.useState('');
   const [newItemDescription, setNewItemDescription] = React.useState('');
   const [newItemImageMode, setNewItemImageMode] = React.useState<'file' | 'url'>('file');
-  const [newItemImageFile, setNewItemImageFile] = React.useState<File | null>(null);
-  const [newItemImageUrl, setNewItemImageUrl] = React.useState('');
-  const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string>('');
+  const [selectedFiles, setSelectedFiles] = React.useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = React.useState<string[]>([]);
+  const [pastedUrls, setPastedUrls] = React.useState<string[]>([]);
+  const [urlInput, setUrlInput] = React.useState('');
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setNewItemImageFile(file);
-    if (file) {
+  const handleMultiFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setSelectedFiles(prev => [...prev, ...files]);
+    
+    files.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreviewUrl(reader.result as string);
+        setPreviewUrls(prev => [...prev, reader.result as string]);
       };
       reader.readAsDataURL(file);
-    } else {
-      setImagePreviewUrl('');
+    });
+  };
+
+  const removeFilePreview = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddUrl = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (urlInput.trim()) {
+      setPastedUrls(prev => [...prev, urlInput.trim()]);
+      setUrlInput('');
     }
+  };
+
+  const removePastedUrl = (index: number) => {
+    setPastedUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -91,20 +110,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setSuccessMsg('');
 
     try {
-      let finalImageUrl = 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=600';
+      let finalImages: string[] = [];
 
-      if (newItemImageMode === 'file' && newItemImageFile) {
-        try {
-          // Attempt Storage Bucket upload
-          finalImageUrl = await uploadProductImage(newItemImageFile);
-        } catch (uploadErr) {
-          console.warn('Storage Bucket upload failed, falling back to base64:', uploadErr);
-          // Base64 Fallback
-          finalImageUrl = await toBase64(newItemImageFile);
+      if (newItemImageMode === 'file') {
+        if (selectedFiles.length > 0) {
+          const uploadPromises = selectedFiles.map(async (file) => {
+            try {
+              return await uploadProductImage(file);
+            } catch (uploadErr) {
+              console.warn('Storage Bucket upload failed, falling back to base64:', uploadErr);
+              return await toBase64(file);
+            }
+          });
+          finalImages = await Promise.all(uploadPromises);
         }
-      } else if (newItemImageMode === 'url' && newItemImageUrl.trim()) {
-        finalImageUrl = newItemImageUrl.trim();
+      } else {
+        finalImages = [...pastedUrls];
+        if (urlInput.trim()) {
+          finalImages.push(urlInput.trim());
+        }
       }
+
+      const mainImageUrl = finalImages[0] || 'https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&q=80&w=600';
 
       const generatedId = `item_${Date.now()}`;
       const priceNum = parseFloat(newItemPrice) || 0;
@@ -116,28 +143,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         category: newItemCategory,
         price: priceNum,
         stock: stockNum,
-        available: stockNum, // Available matches stock initially
-        image: finalImageUrl,
-        description: newItemDescription.trim()
+        available: stockNum,
+        image: mainImageUrl,
+        description: newItemDescription.trim(),
+        images: finalImages.length > 0 ? finalImages : [mainImageUrl]
       };
 
       await addInventoryItemToSupabase(newItem);
-
-      // Refresh catalog list
       await onRefreshInventory();
 
       setSuccessMsg('Successfully added new rental item to inventory!');
       setTimeout(() => setSuccessMsg(''), 4000);
 
-      // Reset form
       setNewItemName('');
       setNewItemCategory('Backdrops');
       setNewItemPrice('');
       setNewItemStock('');
       setNewItemDescription('');
-      setNewItemImageFile(null);
-      setNewItemImageUrl('');
-      setImagePreviewUrl('');
+      setSelectedFiles([]);
+      setPreviewUrls([]);
+      setPastedUrls([]);
+      setUrlInput('');
       setShowAddForm(false);
     } catch (err: any) {
       console.error(err);
@@ -295,6 +321,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   items JSONB NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );`;
+
+  const sqlUpdateSchema = `ALTER TABLE inventory ADD COLUMN images JSONB;`;
 
   return (
     <div id="admin-panel-container" className="bg-white rounded-3xl p-6 md:p-8 border border-blush shadow-xs space-y-8">
@@ -456,6 +484,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <span className="font-semibold text-gray-700 block">2. Orders Log Table Query</span>
                   <pre className="bg-gray-900 text-gray-200 p-3 rounded-lg overflow-x-auto max-h-32">
                     {sqlOrdersSchema}
+                  </pre>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="font-semibold text-gray-700 block">3. Multi-Image Column Query (Run if database already exists)</span>
+                  <pre className="bg-gray-900 text-gray-200 p-3 rounded-lg overflow-x-auto max-h-32">
+                    {sqlUpdateSchema}
                   </pre>
                 </div>
               </div>
@@ -628,7 +663,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[11px] font-semibold text-gray-700 block">Price Per Day ($)</label>
+                    <label className="text-[11px] font-semibold text-gray-700 block">Price Per Day (Rs.)</label>
                     <input
                       type="number"
                       min="0"
@@ -677,7 +712,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         onChange={() => setNewItemImageMode('file')}
                         className="accent-terracotta"
                       />
-                      Upload Image File
+                      Upload Product Photos (Multiple)
                     </label>
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
@@ -687,61 +722,90 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         onChange={() => setNewItemImageMode('url')}
                         className="accent-terracotta"
                       />
-                      Paste Image URL
+                      Add Image URLs
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-                    <div className="lg:col-span-8">
-                      {newItemImageMode === 'file' ? (
-                        <div className="space-y-1.5">
-                          <label className="w-full h-24 border-2 border-dashed border-blush-dark hover:border-camel rounded-2xl flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors bg-white">
-                            <Upload className="w-5 h-5 text-camel" />
-                            <span className="text-[10px] text-gray-500 font-medium">Click to select product photo</span>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={handleFileChange}
-                              className="hidden"
-                            />
-                          </label>
-                          {newItemImageFile && (
-                            <p className="text-[10px] text-gray-500 font-mono italic">
-                              File: {newItemImageFile.name} ({(newItemImageFile.size / 1024).toFixed(1)} KB)
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-semibold text-gray-700 block">Image URL</label>
+                  <div className="space-y-4">
+                    {newItemImageMode === 'file' ? (
+                      <div className="space-y-3">
+                        <label className="w-full h-24 border-2 border-dashed border-blush-dark hover:border-camel rounded-2xl flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors bg-white">
+                          <Upload className="w-5 h-5 text-camel animate-pulse" />
+                          <span className="text-[11px] text-gray-700 font-semibold">Click to select files</span>
+                          <span className="text-[9px] text-gray-400">Supports selecting multiple images at once</span>
                           <input
-                            type="text"
-                            placeholder="https://images.unsplash.com/... or base64"
-                            value={newItemImageUrl}
-                            onChange={(e) => {
-                              setNewItemImageUrl(e.target.value);
-                              setImagePreviewUrl(e.target.value);
-                            }}
-                            className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-blush focus:outline-hidden focus:ring-1 focus:ring-camel focus:border-camel bg-white"
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleMultiFileChange}
+                            className="hidden"
                           />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Preview box */}
-                    <div className="lg:col-span-4 flex justify-center">
-                      <div className="w-24 h-24 rounded-2xl border border-blush bg-white overflow-hidden flex items-center justify-center shrink-0 shadow-inner">
-                        {imagePreviewUrl ? (
-                          <img
-                            src={imagePreviewUrl}
-                            alt="Item Preview"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-[9px] text-gray-400 font-medium">No Preview</span>
+                        </label>
+                        
+                        {/* File preview thumbnails */}
+                        {previewUrls.length > 0 && (
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-semibold text-gray-500 block">Selected Images ({selectedFiles.length})</span>
+                            <div className="flex flex-wrap gap-3">
+                              {previewUrls.map((pUrl, idx) => (
+                                <div key={idx} className="relative w-16 h-16 rounded-xl border border-blush bg-white overflow-hidden shadow-xs shrink-0 group/preview">
+                                  <img src={pUrl} alt="Upload preview" className="w-full h-full object-cover" />
+                                  <button
+                                    type="button"
+                                    onClick={() => removeFilePreview(idx)}
+                                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-xs cursor-pointer text-[9px] font-bold"
+                                    title="Remove photo"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-3 bg-white p-4 border border-blush rounded-2xl">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="https://images.unsplash.com/... or paste link"
+                            value={urlInput}
+                            onChange={(e) => setUrlInput(e.target.value)}
+                            className="flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-blush focus:outline-hidden focus:ring-1 focus:ring-camel focus:border-camel bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddUrl}
+                            className="px-4 py-2 bg-camel hover:bg-camel-dark text-white text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-xs shrink-0"
+                          >
+                            + Add Image
+                          </button>
+                        </div>
+
+                        {/* Pasted URLs thumbnails */}
+                        {pastedUrls.length > 0 && (
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-semibold text-gray-500 block">Added Image Links ({pastedUrls.length})</span>
+                            <div className="flex flex-wrap gap-3">
+                              {pastedUrls.map((pUrl, idx) => (
+                                <div key={idx} className="relative w-16 h-16 rounded-xl border border-blush bg-white overflow-hidden shadow-xs shrink-0 group/preview">
+                                  <img src={pUrl} alt="URL preview" className="w-full h-full object-cover" />
+                                  <button
+                                    type="button"
+                                    onClick={() => removePastedUrl(idx)}
+                                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-xs cursor-pointer text-[9px] font-bold"
+                                    title="Remove URL"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -804,7 +868,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </td>
                       <td className="px-5 py-3.5 font-medium text-gray-900">{item.name}</td>
                       <td className="px-5 py-3.5">{item.category}</td>
-                      <td className="px-5 py-3.5 text-right font-mono font-medium">${item.price}</td>
+                      <td className="px-5 py-3.5 text-right font-mono font-medium">Rs. {item.price}</td>
                       <td className="px-5 py-3.5 text-center font-mono">{item.stock}</td>
                       <td className="px-5 py-3.5 text-center font-mono">
                         <span className={`px-2 py-0.5 rounded-sm font-semibold ${item.available <= 0 ? 'bg-red-50 text-red-600' : 'bg-olive/10 text-olive-dark'}`}>

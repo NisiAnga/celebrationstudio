@@ -40,7 +40,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({ cart, onSubmit }) => {
     return cart.reduce((acc, cartItem) => acc + (cartItem.item.price * cartItem.quantity), 0) * (rentalDays || 1);
   }, [cart, rentalDays]);
 
-  const deliveryFee = deliveryNeeded ? 65 : 0;
+  const deliveryFee = deliveryNeeded ? 6500 : 0;
   const total = subtotal + deliveryFee;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -242,7 +242,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({ cart, onSubmit }) => {
             />
             <div className="p-2.5 bg-blush/40 text-[11px] text-gray-600 rounded-lg flex items-start gap-2">
               <span className="font-semibold text-camel">Note:</span>
-              <span>A flat setup & luxury logistics fee of $65 is added to your total. Our studio team handles elegant layout and pickup on-site.</span>
+              <span>A flat setup & luxury logistics fee of Rs. 6500 is added to your total. Our studio team handles elegant layout and pickup on-site.</span>
             </div>
           </div>
         ) : (
@@ -272,17 +272,17 @@ export const BookingForm: React.FC<BookingFormProps> = ({ cart, onSubmit }) => {
         <div className="space-y-2 text-xs">
           <div className="flex justify-between text-gray-500">
             <span>Rental Subtotal ({rentalDays || 1} {rentalDays === 1 ? 'day' : 'days'}):</span>
-            <span className="font-mono font-medium">${subtotal}</span>
+            <span className="font-mono font-medium">Rs. {subtotal}</span>
           </div>
           {deliveryNeeded && (
             <div className="flex justify-between text-gray-500">
               <span>White-glove Delivery & Setup:</span>
-              <span className="font-mono font-medium">${deliveryFee}</span>
+              <span className="font-mono font-medium">Rs. {deliveryFee}</span>
             </div>
           )}
           <div className="flex justify-between text-sm font-semibold text-gray-900 pt-2 border-t border-dashed border-blush">
             <span className="font-serif-luxury text-base">Grand Total:</span>
-            <span className="font-mono text-terracotta text-lg">${total}</span>
+            <span className="font-mono text-terracotta text-lg">Rs. {total}</span>
           </div>
         </div>
 

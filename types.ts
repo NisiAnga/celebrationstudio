@@ -7,6 +7,7 @@ export interface RentalItem {
   available: number;
   image: string;
   description: string;
+  images?: string[];
 }
 
 export interface CartItem {
@@ -25,6 +26,14 @@ export interface BookingDetails {
   notes?: string;
 }
 
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'need_to_collect'
+  | 'collected_delivered'
+  | 'received'
+  | 'cancelled';
+
 export interface Order {
   id: string;
   booking: BookingDetails;
@@ -32,7 +41,31 @@ export interface Order {
   totalAmount: number;
   rentalDays: number;
   createdAt: string;
-  status: 'pending' | 'confirmed' | 'cancelled';
+  status: OrderStatus;
+}
+
+export interface AdminOrderItem {
+  item_id: string;
+  item_name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface AdminOrder {
+  id: string;
+  customer_name: string;
+  whatsapp_number: string;
+  email: string;
+  start_date: string;
+  end_date: string;
+  delivery_needed: boolean;
+  delivery_address: string;
+  notes: string;
+  total_amount: number;
+  rental_days: number;
+  status: OrderStatus;
+  items: AdminOrderItem[];
+  created_at: string;
 }
 
 export interface BankDetails {

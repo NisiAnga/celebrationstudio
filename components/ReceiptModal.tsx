@@ -22,11 +22,11 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
   // Formatting message for WhatsApp
   const formattedWhatsappMessage = React.useMemo(() => {
     const itemsList = order.items
-      .map(item => `• *${item.item.name}* x ${item.quantity} - $${item.item.price}/day ($${item.item.price * item.quantity * order.rentalDays})`)
+      .map(item => `• *${item.item.name}* x ${item.quantity} - Rs. ${item.item.price}/day (Rs. ${item.item.price * item.quantity * order.rentalDays})`)
       .join('\n');
 
     const deliveryText = order.booking.deliveryNeeded
-      ? `*Delivery Address:* ${order.booking.deliveryAddress}\n*Delivery Fee:* $65`
+      ? `*Delivery Address:* ${order.booking.deliveryAddress}\n*Delivery Fee:* Rs. 6500`
       : `*Studio Pickup:* Yes (12 Rose Garden Lane, Colombo 07)`;
 
     return `✨ *CELEBRATION STUDIO - Rental Invoice* ✨
@@ -39,13 +39,13 @@ Thank you for renting with us! Here are your order details:
 *Rental Items:*
 ${itemsList}
 
-*Rental Subtotal:* $${order.totalAmount - (order.booking.deliveryNeeded ? 65 : 0)}
+*Rental Subtotal:* Rs. ${order.totalAmount - (order.booking.deliveryNeeded ? 6500 : 0)}
 ${deliveryText}
-*Total Amount:* $${order.totalAmount}
+*Total Amount:* Rs. ${order.totalAmount}
 
 ---------------------------
 *Manual Payment Instructions:*
-Since we do not support automated gateways, please transfer $${order.totalAmount} via bank transfer to hold your reservation, and share a screenshot of the payment slip here.
+Since we do not support automated gateways, please transfer Rs. ${order.totalAmount} via bank transfer to hold your reservation, and share a screenshot of the payment slip here.
 
 *Bank Credentials:*
 • *Bank:* ${bankDetails.bankName}
@@ -157,9 +157,9 @@ We look forward to making your special occasion magical! 🌸✨`;
                       <span className="text-gray-400 text-[10px] font-light">Category: {cartItem.item.category}</span>
                     </div>
                     <div className="text-right flex items-center gap-6 font-mono text-gray-700">
-                      <span>{cartItem.quantity} x ${cartItem.item.price}/day</span>
+                      <span>{cartItem.quantity} x Rs. {cartItem.item.price}/day</span>
                       <span className="font-semibold text-gray-900 w-16">
-                        ${cartItem.item.price * cartItem.quantity * order.rentalDays}
+                        Rs. {cartItem.item.price * cartItem.quantity * order.rentalDays}
                       </span>
                     </div>
                   </div>
@@ -171,17 +171,17 @@ We look forward to making your special occasion magical! 🌸✨`;
             <div className="space-y-1.5 text-xs text-right max-w-xs ml-auto">
               <div className="flex justify-between text-gray-500">
                 <span>Items Subtotal:</span>
-                <span className="font-mono">${order.totalAmount - (order.booking.deliveryNeeded ? 65 : 0)}</span>
+                <span className="font-mono">Rs. {order.totalAmount - (order.booking.deliveryNeeded ? 6500 : 0)}</span>
               </div>
               {order.booking.deliveryNeeded && (
                 <div className="flex justify-between text-gray-500">
                   <span>Luxury Delivery & Setup:</span>
-                  <span className="font-mono">$65</span>
+                  <span className="font-mono">Rs. 6500</span>
                 </div>
               )}
               <div className="flex justify-between font-bold text-gray-900 text-sm pt-2 border-t border-blush/40">
                 <span className="font-serif-luxury text-base">Total Due Amount:</span>
-                <span className="font-mono text-base text-terracotta">${order.totalAmount}</span>
+                <span className="font-mono text-base text-terracotta">Rs. {order.totalAmount}</span>
               </div>
             </div>
 

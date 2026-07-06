@@ -13,7 +13,8 @@ import { ItemCard } from '../components/ItemCard';
 import { BookingForm } from '../components/BookingForm';
 import { ReceiptModal } from '../components/ReceiptModal';
 import { DEFAULT_INVENTORY_ITEMS } from '../lib/googleSheets';
-import { getInventoryFromSupabase, updateSupabaseInventoryQuantities, saveOrderToSupabase, getSupabaseConfig } from '../lib/supabase';
+import { ProductDetailModal } from '../components/ProductDetailModal';
+import { getInventoryFromSupabase, updateSupabaseInventoryQuantities, saveOrderToSupabase, getSupabaseConfig, subscribeToInventoryChanges } from '../lib/supabase';
 
 const LOCAL_STORAGE_BANK_KEY = 'celebration_studio_bank';
 const LOCAL_STORAGE_WHATSAPP_KEY = 'celebration_studio_whatsapp';
@@ -57,6 +58,7 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = React.useState('All');
   const [isCartOpen, setIsCartOpen] = React.useState(false);
   const [successAnimation, setSuccessAnimation] = React.useState(false);
+  const [selectedProduct, setSelectedProduct] = React.useState<RentalItem | null>(null);
 
   // Sync / Load inventory from Supabase
   const fetchInventory = React.useCallback(async () => {
@@ -120,6 +122,22 @@ export default function App() {
     fetchInventory();
   }, [fetchInventory]);
 
+  // Supabase Realtime subscription: patch individual inventory items in-place
+  // whenever another device or the admin panel updates stock.
+  // Requires the `inventory` table to have Realtime enabled in the Supabase dashboard.
+  React.useEffect(() => {
+    const { url, anonKey } = getSupabaseConfig();
+    if (!url || !anonKey) return; // Skip if not configured
+
+    const unsubscribe = subscribeToInventoryChanges((updatedItem) => {
+      setInventory(prevInv =>
+        prevInv.map(item => item.id === updatedItem.id ? updatedItem : item)
+      );
+    });
+
+    return unsubscribe; // Clean up channel on unmount
+  }, []);
+
   // Cart operations
   const handleAddToCart = (item: RentalItem, qty: number) => {
     setCart(prevCart => {
@@ -141,7 +159,7 @@ export default function App() {
 
   // Checkout handling
   const handlePlaceOrder = async (bookingDetails: BookingDetails) => {
-    // 1. Double check stocks
+    // 1. Double-check stocks against live local inventory state
     const insufficient: string[] = [];
     cart.forEach(cartItem => {
       const invItem = inventory.find(i => i.id === cartItem.item.id);
@@ -177,45 +195,59 @@ export default function App() {
       status: 'pending'
     };
 
-    // 2. Perform Stock deduction and order logging in Supabase if online
-    const isConfigured = syncStatus.supabaseUrl && syncStatus.connected;
-    if (isConfigured) {
-      setSyncStatus(prev => ({ ...prev, loading: true }));
-      try {
-        const deductPayload = cart.map(cartItem => ({
-          itemId: cartItem.item.id,
-          deductQty: cartItem.quantity
-        }));
-        
-        await updateSupabaseInventoryQuantities(deductPayload);
-        await saveOrderToSupabase(newOrder);
-        
-        // Re-fetch fresh stock levels
-        await fetchInventory();
-      } catch (err: any) {
-        console.error('Failed to update Supabase:', err);
-        alert('Stock deduction in Supabase failed, but we placed your local order in-memory. Please check your tables or synchronize manually in Settings.');
+    // 2. Optimistic local update — immediately deduct from storefront so UI
+    //    reflects the new availability without waiting for any async call.
+    const snapshotCart = [...cart]; // keep a reference before clearing
+    setInventory(prevInv => prevInv.map(invItem => {
+      const cartMatch = snapshotCart.find(c => c.item.id === invItem.id);
+      if (cartMatch) {
+        return {
+          ...invItem,
+          available: Math.max(0, invItem.available - cartMatch.quantity)
+        };
       }
-    } else {
-      // Local fallback: deduct in memory
-      setInventory(prevInv => prevInv.map(invItem => {
-        const cartMatch = cart.find(c => c.item.id === invItem.id);
-        if (cartMatch) {
-          return {
-            ...invItem,
-            available: Math.max(0, invItem.available - cartMatch.quantity)
-          };
-        }
-        return invItem;
-      }));
-    }
+      return invItem;
+    }));
 
-    // 3. Clear cart and open invoice
+    // 3. Clear cart and show receipt immediately (UX feels instant)
     setCurrentOrder(newOrder);
     setCart([]);
     setIsCartOpen(false);
     setSuccessAnimation(true);
     setTimeout(() => setSuccessAnimation(false), 4000);
+
+    // 4. Persist to Supabase if credentials are configured.
+    //    Use getSupabaseConfig() directly — avoids depending on the async
+    //    syncStatus.connected which may still be false on first load.
+    const { url: supabaseUrl, anonKey } = getSupabaseConfig();
+    const isConfigured = !!(supabaseUrl && anonKey);
+
+    if (isConfigured) {
+      setSyncStatus(prev => ({ ...prev, loading: true }));
+      try {
+        const deductPayload = snapshotCart.map(cartItem => ({
+          itemId: cartItem.item.id,
+          deductQty: cartItem.quantity
+        }));
+
+        await updateSupabaseInventoryQuantities(deductPayload);
+        await saveOrderToSupabase(newOrder);
+
+        setSyncStatus(prev => ({
+          ...prev,
+          loading: false,
+          lastSynced: new Date().toLocaleTimeString(),
+          error: null
+        }));
+      } catch (err: any) {
+        console.error('Failed to persist order to Supabase:', err);
+        // Rollback optimistic update by re-fetching the true state from DB
+        await fetchInventory();
+        setSyncStatus(prev => ({ ...prev, loading: false, error: err.message }));
+        alert('Warning: The order was placed locally, but syncing to the database failed. Stock has been refreshed to the last known database state. Please check Settings.');
+      }
+    }
+    // If not configured, the optimistic local deduction already applied — no further action needed.
   };
 
   // Filter products
@@ -382,6 +414,7 @@ export default function App() {
                         cartQuantity={cartMatch ? cartMatch.quantity : 0}
                         onAddToCart={handleAddToCart}
                         onRemoveFromCart={handleRemoveFromCart}
+                        onViewDetails={(item) => setSelectedProduct(item)}
                       />
                     );
                   })}
@@ -415,7 +448,7 @@ export default function App() {
                         <div key={cartItem.item.id} className="py-3 flex justify-between items-center gap-3 text-xs">
                           <div className="flex-1">
                             <span className="font-semibold text-gray-800 block line-clamp-1">{cartItem.item.name}</span>
-                            <span className="text-gray-400 text-[10px] block">Rent: ${cartItem.item.price}/day</span>
+                            <span className="text-gray-400 text-[10px] block">Rent: Rs. {cartItem.item.price}/day</span>
                           </div>
                           <div className="text-right flex items-center gap-4">
                             <span className="font-mono font-medium text-gray-700 bg-blush-light px-2 py-0.5 rounded-md">
@@ -493,6 +526,15 @@ export default function App() {
           onClose={() => setCurrentOrder(null)}
         />
       )}
+
+      {/* Product Details overlay modal */}
+      <ProductDetailModal
+        item={selectedProduct}
+        isOpen={selectedProduct !== null}
+        onClose={() => setSelectedProduct(null)}
+        onAddToCart={handleAddToCart}
+        cartQuantity={selectedProduct ? (cart.find(c => c.item.id === selectedProduct.id)?.quantity || 0) : 0}
+      />
 
       {/* Elegant Aesthetic Studio Footer */}
       <footer className="border-t border-blush/60 bg-white/70 py-8 text-center text-[11px] text-gray-400 font-light mt-16 max-w-7xl mx-auto px-4">
