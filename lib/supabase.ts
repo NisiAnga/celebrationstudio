@@ -452,8 +452,14 @@ export async function addInventoryItemToSupabase(item: RentalItem): Promise<void
  * Fires `onItemChange` whenever a row is updated so the storefront
  * can patch individual items without a full re-fetch.
  * Returns an unsubscribe function — call it on component unmount.
+ *
+ * @param channelId - A unique channel name per subscription. Use a random suffix
+ *   when multiple tabs/components subscribe simultaneously to prevent Supabase
+ *   from collapsing them into a single connection and silently dropping events.
+ * @param onItemChange - Callback fired with the updated RentalItem.
  */
 export function subscribeToInventoryChanges(
+  channelId: string,
   onItemChange: (updatedItem: RentalItem) => void
 ): () => void {
   const client = getSupabaseClient();
@@ -463,7 +469,7 @@ export function subscribeToInventoryChanges(
   }
 
   const channel = client
-    .channel('inventory-realtime')
+    .channel(channelId)
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'inventory' },
@@ -517,6 +523,29 @@ export async function deleteInventoryItemFromSupabase(itemId: string): Promise<v
   const { error } = await client
     .from('inventory')
     .delete()
+    .eq('id', itemId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+/**
+ * Updates stock and available quantities for an item in the 'inventory' table.
+ */
+export async function updateInventoryStockInSupabase(
+  itemId: string,
+  stock: number,
+  available: number
+): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase client not configured.');
+  }
+
+  const { error } = await client
+    .from('inventory')
+    .update({ stock, available })
     .eq('id', itemId);
 
   if (error) {

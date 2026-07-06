@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { 
   getSupabaseConfig, saveSupabaseConfig, seedSupabaseInventory,
-  uploadProductImage, addInventoryItemToSupabase, deleteInventoryItemFromSupabase 
+  uploadProductImage, addInventoryItemToSupabase, deleteInventoryItemFromSupabase,
+  updateInventoryStockInSupabase
 } from '../lib/supabase';
 
 interface AdminPanelProps {
@@ -194,6 +195,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setIsSyncing(false);
     }
   };
+
+  const handleUpdateStock = async (item: RentalItem, newStock: number) => {
+    if (isNaN(newStock) || newStock < 0) return;
+    if (newStock === item.stock) return;
+
+    setIsSyncing(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const delta = newStock - item.stock;
+      const newAvailable = Math.max(0, item.available + delta);
+
+      await updateInventoryStockInSupabase(item.id, newStock, newAvailable);
+      await onRefreshInventory();
+      setSuccessMsg(`Successfully updated stock for "${item.name}".`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(`Failed to update stock: ${err.message || 'Verify database permissions.'}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const [errorMsg, setErrorMsg] = React.useState('');
 
   // Supabase input states
@@ -869,7 +895,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <td className="px-5 py-3.5 font-medium text-gray-900">{item.name}</td>
                       <td className="px-5 py-3.5">{item.category}</td>
                       <td className="px-5 py-3.5 text-right font-mono font-medium">Rs. {item.price}</td>
-                      <td className="px-5 py-3.5 text-center font-mono">{item.stock}</td>
+                      <td className="px-5 py-3.5 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          defaultValue={item.stock}
+                          onBlur={(e) => handleUpdateStock(item, parseInt(e.target.value, 10))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          disabled={isSyncing}
+                          className="w-16 text-center border border-blush rounded-lg py-1 px-1.5 focus:outline-none focus:ring-1 focus:ring-camel focus:border-camel font-mono text-xs font-semibold bg-white"
+                        />
+                      </td>
                       <td className="px-5 py-3.5 text-center font-mono">
                         <span className={`px-2 py-0.5 rounded-sm font-semibold ${item.available <= 0 ? 'bg-red-50 text-red-600' : 'bg-olive/10 text-olive-dark'}`}>
                           {item.available}
