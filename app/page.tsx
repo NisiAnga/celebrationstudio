@@ -376,28 +376,42 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Hero Header Presentation (Centered elegant display) */}
-      <header className="max-w-4xl mx-auto px-4 pt-10 pb-6 text-center">
-        <div className="flex justify-center mb-4">
-          <img 
-            src="2.png" 
-            alt="Celebration Studio Luxury Logo" 
-            className="h-32 w-32 object-contain rounded-full shadow-md bg-white border border-blush p-1"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
+      {/* Hero Header Presentation (Luxury Cover Photo Banner) */}
+      <header className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4">
+        <div className="relative rounded-3xl overflow-hidden h-72 md:h-80 shadow-md border border-blush/80 flex flex-col items-center justify-center text-center px-6">
+          {/* Cover photo background image */}
+          <div 
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out hover:scale-[1.02]"
+            style={{ backgroundImage: "url('/store_cover.png')" }}
           />
+          {/* Backdrop overlay for rich aesthetic & logo contrast */}
+          <div className="absolute inset-0 bg-black/35 backdrop-blur-[1px]" />
+
+          {/* Foreground content: Logo and Brand Typography */}
+          <div className="relative z-10 space-y-4">
+            <div className="flex justify-center">
+              <img 
+                src="2.png" 
+                alt="Celebration Studio Luxury Logo" 
+                className="h-20 w-20 md:h-24 md:w-24 object-contain rounded-full shadow-lg bg-white border border-white/60 p-1 transition-all duration-300 hover:scale-105"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+            <div className="space-y-1">
+              <h1 className="font-serif-luxury text-3xl md:text-5xl font-medium tracking-wider text-white drop-shadow-md">
+                Celebration Studio
+              </h1>
+              <p className="text-[10px] md:text-xs uppercase tracking-widest text-[#f5d0a9] font-bold drop-shadow-xs">
+                Exquisite Event Rentals & Designs
+              </p>
+              <p className="max-w-lg mx-auto text-xs text-white/90 font-light leading-relaxed drop-shadow-xs">
+                Curating romantic, cozy, and luxury items in Terracotta, Blush, Camel, and Olive tones to render your weddings and celebrations completely unforgettable.
+              </p>
+            </div>
+          </div>
         </div>
-        <h1 className="font-serif-luxury text-[42px] md:text-[54px] font-medium tracking-wide text-gray-950 leading-tight">
-          Celebration Studio
-        </h1>
-        <div className="h-[1px] w-24 bg-camel/40 mx-auto my-3"></div>
-        <p className="text-xs uppercase tracking-widest text-camel font-semibold">
-          Exquisite Event Rentals & Designs
-        </p>
-        <p className="max-w-md mx-auto text-xs text-gray-500 font-light mt-3 leading-relaxed">
-          Curating romantic, cozy, and luxury items in Terracotta, Blush, Camel, and Olive tones to render your special weddings and celebrations completely unforgettable.
-        </p>
       </header>
 
       {/* Main Container */}
