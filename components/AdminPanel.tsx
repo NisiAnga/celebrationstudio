@@ -220,6 +220,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const handleUpdateAvailable = async (item: RentalItem, newAvailable: number) => {
+    if (isNaN(newAvailable) || newAvailable < 0) return;
+    if (newAvailable === item.available) return;
+
+    setIsSyncing(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      await updateInventoryStockInSupabase(item.id, item.stock, newAvailable);
+      await onRefreshInventory();
+      setSuccessMsg(`Successfully updated available stock for "${item.name}".`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(`Failed to update available stock: ${err.message || 'Verify database permissions.'}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const [errorMsg, setErrorMsg] = React.useState('');
 
   // Supabase input states
@@ -910,10 +931,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           className="w-16 text-center border border-blush rounded-lg py-1 px-1.5 focus:outline-none focus:ring-1 focus:ring-camel focus:border-camel font-mono text-xs font-semibold bg-white"
                         />
                       </td>
-                      <td className="px-5 py-3.5 text-center font-mono">
-                        <span className={`px-2 py-0.5 rounded-sm font-semibold ${item.available <= 0 ? 'bg-red-50 text-red-600' : 'bg-olive/10 text-olive-dark'}`}>
-                          {item.available}
-                        </span>
+                      <td className="px-5 py-3.5 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          defaultValue={item.available}
+                          onBlur={(e) => handleUpdateAvailable(item, parseInt(e.target.value, 10))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              (e.target as HTMLInputElement).blur();
+                            }
+                          }}
+                          disabled={isSyncing}
+                          className={`w-16 text-center border rounded-lg py-1 px-1.5 focus:outline-none focus:ring-1 focus:ring-camel focus:border-camel font-mono text-xs font-semibold bg-white ${item.available <= 0 ? 'border-red-300 text-red-600 bg-red-50/10' : 'border-blush text-gray-700'}`}
+                        />
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         <button
