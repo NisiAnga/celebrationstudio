@@ -337,13 +337,6 @@ export default function AdminApp() {
         </div>
         <div className="flex items-center gap-3">
           <a
-            href="/admin/orders"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold tracking-wider uppercase border border-terracotta/30 bg-terracotta/5 text-terracotta hover:bg-terracotta hover:text-white transition-all"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-terracotta" />
-            Orders
-          </a>
-          <a
             href="/"
             target="_blank"
             rel="noopener noreferrer"

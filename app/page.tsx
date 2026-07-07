@@ -267,38 +267,10 @@ export default function App() {
     setSuccessAnimation(true);
     setTimeout(() => setSuccessAnimation(false), 4000);
 
-    // 4. Persist to Supabase if credentials are configured.
-    //    Use getSupabaseConfig() directly — avoids depending on the async
-    //    syncStatus.connected which may still be false on first load.
-    const { url: supabaseUrl, anonKey } = getSupabaseConfig();
-    const isConfigured = !!(supabaseUrl && anonKey);
-
-    if (isConfigured) {
-      setSyncStatus(prev => ({ ...prev, loading: true }));
-      try {
-        const deductPayload = snapshotCart.map(cartItem => ({
-          itemId: cartItem.item.id,
-          deductQty: cartItem.quantity
-        }));
-
-        await updateSupabaseInventoryQuantities(deductPayload);
-        await saveOrderToSupabase(newOrder);
-
-        setSyncStatus(prev => ({
-          ...prev,
-          loading: false,
-          lastSynced: new Date().toLocaleTimeString(),
-          error: null
-        }));
-      } catch (err: any) {
-        console.error('Failed to persist order to Supabase:', err);
-        // Rollback optimistic update by re-fetching the true state from DB
-        await fetchInventory();
-        setSyncStatus(prev => ({ ...prev, loading: false, error: err.message }));
-        alert('Warning: The order was placed locally, but syncing to the database failed. Stock has been refreshed to the last known database state. Please check Settings.');
-      }
-    }
-    // If not configured, the optimistic local deduction already applied — no further action needed.
+    // 4. Disconnected from Database for Orders/Checkout:
+    //    We do not write the order or deduct database inventory. The optimistic local
+    //    deduction applied above remains active for the current storefront session.
+    //    No sync/DB calls are made here.
   };
 
   // Filter products
