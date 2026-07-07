@@ -293,15 +293,9 @@ export default function CheckoutPage() {
         status: 'pending'
       };
 
-      // 3. Deduct stock in Supabase database
-      const deductPayload = cart.map(c => ({
-        itemId: c.item.id,
-        deductQty: c.quantity
-      }));
-      await updateSupabaseInventoryQuantities(deductPayload);
-
-      // 4. Save order to Supabase database (triggers real-time update in Admin Orders)
-      await saveOrderToSupabase(orderPayload);
+      // 3. Disconnected from Database for Orders/Checkout:
+      //    We do not write the order or deduct database inventory. 
+      //    No sync/DB calls are made here.
 
       // 5. Open WhatsApp with formatted invoice text
       const finalMsg = formatInvoiceMessage(

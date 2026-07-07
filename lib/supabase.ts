@@ -114,225 +114,66 @@ export async function getInventoryFromSupabase(): Promise<RentalItem[]> {
 
 /**
  * Deducts stock from "inventory" table when an order is successfully placed.
+ * (Disconnected - No-op under the new inventory-only architecture)
  */
 export async function updateSupabaseInventoryQuantities(
   itemsToUpdate: { itemId: string; deductQty: number }[]
 ): Promise<void> {
-  const client = getSupabaseClient();
-  if (!client) {
-    throw new Error('Supabase client not configured.');
-  }
-
-  for (const { itemId, deductQty } of itemsToUpdate) {
-    // 1. Fetch current available count
-    const { data, error: fetchError } = await client
-      .from('inventory')
-      .select('available')
-      .eq('id', itemId)
-      .single();
-
-    if (fetchError) {
-      console.error(`Failed to fetch current stock for item ${itemId}:`, fetchError);
-      continue;
-    }
-
-    const currentAvailable = Number(data?.available) || 0;
-    const newAvailable = Math.max(0, currentAvailable - deductQty);
-
-    // 2. Perform individual stock deduction
-    const { error: updateError } = await client
-      .from('inventory')
-      .update({ available: newAvailable })
-      .eq('id', itemId);
-
-    if (updateError) {
-      throw new Error(`Failed to update stock in Supabase for ${itemId}: ${updateError.message}`);
-    }
-  }
+  // Disconnected: Do not update database inventory automatically on checkout
+  return;
 }
 
 /**
  * Logs details of a placed order to the Supabase "orders" table for permanent tracing.
+ * (Disconnected - No-op under the new inventory-only architecture)
  */
 export async function saveOrderToSupabase(order: Order): Promise<void> {
-  const client = getSupabaseClient();
-  if (!client) {
-    return; // Non-blocking if offline/unconfigured
-  }
-
-  const orderPayload = {
-    id: order.id,
-    customer_name: order.booking.customerName,
-    whatsapp_number: order.booking.whatsappNumber,
-    email: order.booking.email,
-    start_date: order.booking.startDate,
-    end_date: order.booking.endDate,
-    delivery_needed: order.booking.deliveryNeeded,
-    delivery_address: order.booking.deliveryAddress || '',
-    notes: order.booking.notes || '',
-    total_amount: order.totalAmount,
-    rental_days: order.rentalDays,
-    status: order.status,
-    items: order.items.map(i => ({
-      item_id: i.item.id,
-      item_name: i.item.name,
-      price: i.item.price,
-      quantity: i.quantity
-    })) // Store clean JSON representation
-  };
-
-  const { error } = await client
-    .from('orders')
-    .insert([orderPayload]);
-
-  if (error) {
-    console.error('Supabase logging order error:', error);
-    throw new Error(`Failed to save booking order: ${error.message}`);
-  }
+  // Disconnected: Do not log orders to database
+  return;
 }
 
 /**
  * Fetches all orders from the Supabase "orders" table, newest first.
+ * (Disconnected - Returns empty list)
  */
 export async function getOrdersFromSupabase(): Promise<AdminOrder[]> {
-  const client = getSupabaseClient();
-  if (!client) {
-    throw new Error('Supabase client not configured.');
-  }
-
-  const { data, error } = await client
-    .from('orders')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    throw new Error(`Failed to fetch orders: ${error.message}`);
-  }
-
-  return (data || []).map(row => ({
-    id: row.id,
-    customer_name: row.customer_name || '',
-    whatsapp_number: row.whatsapp_number || '',
-    email: row.email || '',
-    start_date: row.start_date || '',
-    end_date: row.end_date || '',
-    delivery_needed: !!row.delivery_needed,
-    delivery_address: row.delivery_address || '',
-    notes: row.notes || '',
-    total_amount: Number(row.total_amount) || 0,
-    rental_days: Number(row.rental_days) || 1,
-    status: (row.status as AdminOrder['status']) || 'pending',
-    items: Array.isArray(row.items) ? row.items : [],
-    created_at: row.created_at || new Date().toISOString(),
-  }));
+  // Disconnected: No database logs for orders
+  return [];
 }
 
 /**
  * Updates the status of an order in the Supabase "orders" table.
+ * (Disconnected - No-op)
  */
 export async function updateOrderStatus(
   orderId: string,
   status: OrderStatus
 ): Promise<void> {
-  const client = getSupabaseClient();
-  if (!client) {
-    throw new Error('Supabase client not configured.');
-  }
-
-  const { error } = await client
-    .from('orders')
-    .update({ status })
-    .eq('id', orderId);
-
-  if (error) {
-    throw new Error(`Failed to update order status: ${error.message}`);
-  }
+  // Disconnected: No order state tracking in database
+  return;
 }
 
 /**
  * Restores (increments) the available count in the inventory table when
  * an order is marked as "received" (items returned to stock).
+ * (Disconnected - No-op)
  */
 export async function restoreInventoryQuantities(
   itemsToRestore: { itemId: string; restoreQty: number }[]
 ): Promise<void> {
-  const client = getSupabaseClient();
-  if (!client) {
-    throw new Error('Supabase client not configured.');
-  }
-
-  for (const { itemId, restoreQty } of itemsToRestore) {
-    // 1. Fetch current available count
-    const { data, error: fetchError } = await client
-      .from('inventory')
-      .select('available, stock')
-      .eq('id', itemId)
-      .single();
-
-    if (fetchError) {
-      console.error(`Failed to fetch stock for item ${itemId}:`, fetchError);
-      continue;
-    }
-
-    const currentAvailable = Number(data?.available) || 0;
-    const totalStock      = Number(data?.stock)     || 0;
-    // Don't exceed total stock when restoring
-    const newAvailable = Math.min(totalStock, currentAvailable + restoreQty);
-
-    // 2. Increment available
-    const { error: updateError } = await client
-      .from('inventory')
-      .update({ available: newAvailable })
-      .eq('id', itemId);
-
-    if (updateError) {
-      throw new Error(`Failed to restore stock in Supabase for ${itemId}: ${updateError.message}`);
-    }
-  }
+  // Disconnected: No automatic restoration
+  return;
 }
 
 /**
  * Subscribes to new order INSERT events on the "orders" table.
- * Fires the callback with the new AdminOrder so the admin panel
- * can prepend it to the list without a full re-fetch.
- * Returns an unsubscribe function — call it on component unmount.
- * Requires Realtime enabled on the orders table in the Supabase dashboard.
+ * (Disconnected - Returns dummy unsubscriber)
  */
 export function subscribeToNewOrders(
   onNewOrder: (order: AdminOrder) => void
 ): () => void {
-  const client = getSupabaseClient();
-  if (!client) return () => {};
-
-  const channel = client
-    .channel('orders-realtime')
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'orders' },
-      (payload) => {
-        const row = payload.new as Record<string, unknown>;
-        const order: AdminOrder = {
-          id: row.id as string,
-          customer_name: (row.customer_name as string) || '',
-          whatsapp_number: (row.whatsapp_number as string) || '',
-          email: (row.email as string) || '',
-          start_date: (row.start_date as string) || '',
-          end_date: (row.end_date as string) || '',
-          delivery_needed: !!(row.delivery_needed),
-          delivery_address: (row.delivery_address as string) || '',
-          notes: (row.notes as string) || '',
-          total_amount: Number(row.total_amount) || 0,
-          rental_days: Number(row.rental_days) || 1,
-          status: (row.status as AdminOrder['status']) || 'pending',
-          items: Array.isArray(row.items) ? (row.items as AdminOrder['items']) : [],
-          created_at: (row.created_at as string) || new Date().toISOString(),
-        };
-        onNewOrder(order);
-      }
-    )
-    .subscribe();
-
-  return () => { client.removeChannel(channel); };
+  // Disconnected: No order real-time subscription
+  return () => {};
 }
 
 /**
