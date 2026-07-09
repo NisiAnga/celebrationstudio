@@ -456,7 +456,7 @@ export default function App() {
                 Exquisite Event Rentals & Designs
               </p>
               <p className="max-w-lg mx-auto text-xs text-white/90 font-light leading-relaxed drop-shadow-xs">
-                Curating romantic, cozy, and luxury items in Terracotta, Blush, Camel, and Olive tones to render your weddings and celebrations completely unforgettable.
+                Curating romantic, cozy, and luxury items to render your parties and celebrations completely unforgettable.
               </p>
             </div>
           </div>
