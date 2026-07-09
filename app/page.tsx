@@ -320,8 +320,46 @@ export default function App() {
     return cart.reduce((acc, c) => acc + c.quantity, 0);
   }, [cart]);
 
+  // LocalBusiness structured data for Local SEO in Sri Lanka
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "Celebration Studio",
+    "image": [
+      "https://celebrationstudio.lk/store_cover.png",
+      "https://celebrationstudio.lk/store_cover_2.png",
+      "https://celebrationstudio.lk/2.png"
+    ],
+    "description": "Exquisite party and event rental services in Sri Lanka. Rent romantic, cozy, and luxury backdrops, table settings, and custom signs in Terracotta, Blush, Camel, and Olive tones.",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "12 Rose Garden Lane",
+      "addressLocality": "Colombo 07",
+      "addressRegion": "Western Province",
+      "addressCountry": "LK"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": 6.9271,
+      "longitude": 79.8612
+    },
+    "url": "https://celebrationstudio.lk",
+    "telephone": "+94771234567",
+    "priceRange": "$$",
+    "areaServed": {
+      "@type": "AdministrativeArea",
+      "name": "Sri Lanka"
+    }
+  };
+
   return (
     <div className="min-h-screen bg-blush-light text-gray-900 selection:bg-terracotta/20 font-sans relative pb-16">
+      
+      {/* Local Business JSON-LD Schema Script */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       
       {/* Decorative floral vines background overlay in luxury corners */}
       <div className="absolute top-0 left-0 w-64 h-64 bg-[url('https://images.unsplash.com/photo-1526047932273-341f2a7631f9?auto=format&fit=crop&q=80&w=300')] opacity-5 pointer-events-none mix-blend-multiply bg-cover bg-no-repeat rounded-br-full"></div>
