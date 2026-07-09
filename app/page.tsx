@@ -29,10 +29,22 @@ const DEFAULT_BANK_DETAILS: BankDetails = {
 
 const DEFAULT_STUDIO_WHATSAPP = '+94771234567';
 
+const COVER_PHOTOS = ['/store_cover.png', '/store_cover_2.png'];
+
 export default function App() {
   // Administrative custom parameters
   const [bankDetails, setBankDetails] = React.useState<BankDetails>(DEFAULT_BANK_DETAILS);
   const [studioWhatsapp, setStudioWhatsapp] = React.useState<string>(DEFAULT_STUDIO_WHATSAPP);
+
+  // Cover photo carousel state
+  const [currentCoverIndex, setCurrentCoverIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentCoverIndex((prev) => (prev + 1) % COVER_PHOTOS.length);
+    }, 6000); // 6 seconds auto-rotate
+    return () => clearInterval(timer);
+  }, []);
 
   // Supabase integration state
   const [syncStatus, setSyncStatus] = React.useState<SupabaseSyncStatus>(() => {
@@ -371,16 +383,23 @@ export default function App() {
       {/* Hero Header Presentation (Luxury Cover Photo Banner) */}
       <header className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4">
         <div className="relative rounded-3xl overflow-hidden h-72 md:h-80 shadow-md border border-blush/80 flex flex-col items-center justify-center text-center px-6">
-          {/* Cover photo background image */}
-          <div 
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out hover:scale-[1.02]"
-            style={{ backgroundImage: "url('/store_cover.png')" }}
-          />
+          {/* Cover photo background image carousel */}
+          <AnimatePresence mode="popLayout">
+            <motion.div
+              key={currentCoverIndex}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.2 }}
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-700 ease-out hover:scale-[1.02]"
+              style={{ backgroundImage: `url('${COVER_PHOTOS[currentCoverIndex]}')` }}
+            />
+          </AnimatePresence>
           {/* Backdrop overlay for rich aesthetic & logo contrast */}
-          <div className="absolute inset-0 bg-black/35 backdrop-blur-[1px]" />
+          <div className="absolute inset-0 bg-black/35 backdrop-blur-[1px] z-10" />
 
           {/* Foreground content: Logo and Brand Typography */}
-          <div className="relative z-10 space-y-4">
+          <div className="relative z-20 space-y-4">
             <div className="flex justify-center">
               <img 
                 src="2.png" 
@@ -402,6 +421,20 @@ export default function App() {
                 Curating romantic, cozy, and luxury items in Terracotta, Blush, Camel, and Olive tones to render your weddings and celebrations completely unforgettable.
               </p>
             </div>
+          </div>
+
+          {/* Carousel dots indicators */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 z-20">
+            {COVER_PHOTOS.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentCoverIndex(idx)}
+                className={`w-2 h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                  currentCoverIndex === idx ? 'bg-white w-4' : 'bg-white/40 hover:bg-white/70'
+                }`}
+                title={`View image ${idx + 1}`}
+              />
+            ))}
           </div>
         </div>
       </header>
