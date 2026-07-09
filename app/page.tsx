@@ -6,7 +6,7 @@ import {
   ShoppingBag, Trash2, Calendar, ShieldCheck, Sparkles, 
   MapPin, UserCheck, CreditCard, ChevronRight, CheckCircle, 
   Phone, HelpCircle, X, ChevronDown, ListFilter,
-  RefreshCw
+  RefreshCw, Search
 } from 'lucide-react';
 import { RentalItem, CartItem, BookingDetails, Order, BankDetails, SupabaseSyncStatus } from '../types';
 import { ItemCard } from '../components/ItemCard';
@@ -90,6 +90,7 @@ export default function App() {
   // Modals & Navigation Toggles
   const [currentOrder, setCurrentOrder] = React.useState<Order | null>(null);
   const [selectedCategory, setSelectedCategory] = React.useState('All');
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [isCartOpen, setIsCartOpen] = React.useState(false);
   const [successAnimation, setSuccessAnimation] = React.useState(false);
   const [selectedProduct, setSelectedProduct] = React.useState<RentalItem | null>(null);
@@ -277,19 +278,31 @@ export default function App() {
   const categories = ['All', 'Backdrops', 'Table Runners', 'Sign Boards', 'Other', 'Packages'];
 
   const filteredInventory = React.useMemo(() => {
-    if (selectedCategory === 'All') return inventory;
-    if (selectedCategory === 'Other') {
-      const definedCategories = ['backdrops', 'table runners', 'sign boards', 'packages'];
-      return inventory.filter(item => {
-        const cat = (item.category || '').toLowerCase().trim();
-        return !definedCategories.includes(cat);
-      });
+    let items = inventory;
+    if (selectedCategory !== 'All') {
+      if (selectedCategory === 'Other') {
+        const definedCategories = ['backdrops', 'table runners', 'sign boards', 'packages'];
+        items = inventory.filter(item => {
+          const cat = (item.category || '').toLowerCase().trim();
+          return !definedCategories.includes(cat);
+        });
+      } else {
+        items = inventory.filter(item => {
+          const cat = (item.category || '').toLowerCase().trim();
+          return cat === selectedCategory.toLowerCase().trim();
+        });
+      }
     }
-    return inventory.filter(item => {
-      const cat = (item.category || '').toLowerCase().trim();
-      return cat === selectedCategory.toLowerCase().trim();
-    });
-  }, [inventory, selectedCategory]);
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase().trim();
+      items = items.filter(item =>
+        (item.name || '').toLowerCase().includes(query) ||
+        (item.description || '').toLowerCase().includes(query) ||
+        (item.category || '').toLowerCase().includes(query)
+      );
+    }
+    return items;
+  }, [inventory, selectedCategory, searchQuery]);
 
   const cartTotalItems = React.useMemo(() => {
     return cart.reduce((acc, c) => acc + c.quantity, 0);
@@ -333,7 +346,14 @@ export default function App() {
           <div className="flex items-center gap-3">
             {/* Shopping cart button */}
             <button
-              onClick={() => setIsCartOpen(!isCartOpen)}
+              onClick={() => {
+                const minimalCart = cart.map(c => ({
+                  id: c.item.id,
+                  quantity: c.quantity
+                }));
+                sessionStorage.setItem('celebration_studio_checkout_cart', JSON.stringify(minimalCart));
+                window.location.href = '/checkout';
+              }}
               className="relative bg-terracotta hover:bg-terracotta-dark text-white p-2.5 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center cursor-pointer"
               title="View Rental Cart"
             >
@@ -401,22 +421,47 @@ export default function App() {
             </div>
           )}
 
-          {/* Category Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-blush/40">
-            <ListFilter className="w-4 h-4 text-gray-400 shrink-0" />
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide whitespace-nowrap transition-all cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-camel text-white shadow-xs'
-                    : 'bg-white text-gray-500 hover:bg-blush/60 hover:text-gray-700'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+          {/* Filters and Search */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-blush/40 pb-4">
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
+              <ListFilter className="w-4 h-4 text-gray-400 shrink-0" />
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide whitespace-nowrap transition-all cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-camel text-white shadow-xs'
+                      : 'bg-white text-gray-500 hover:bg-blush/60 hover:text-gray-700'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Bar */}
+            <div className="relative w-full sm:max-w-xs shrink-0">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-4 w-4 text-gray-400" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="block w-full pl-10 pr-10 py-1.5 bg-white border border-blush/80 rounded-full text-xs placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-camel/50 focus:border-camel transition-all shadow-xs"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-650 cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Items Grid & Booking Split Pane */}
@@ -432,9 +477,14 @@ export default function App() {
               ) : filteredInventory.length === 0 ? (
                 <div className="py-24 text-center bg-white border border-blush rounded-3xl space-y-3">
                   <HelpCircle className="w-8 h-8 text-gray-300 mx-auto" />
-                  <p className="text-sm font-medium text-gray-600 font-serif-luxury">No items found in this category.</p>
+                  <p className="text-sm font-medium text-gray-600 font-serif-luxury">
+                    {searchQuery ? "No items found matching your search." : "No items found in this category."}
+                  </p>
                   <button
-                    onClick={() => setSelectedCategory('All')}
+                    onClick={() => {
+                      setSelectedCategory('All');
+                      setSearchQuery('');
+                    }}
                     className="text-xs text-terracotta hover:underline font-semibold"
                   >
                     Reset filters
